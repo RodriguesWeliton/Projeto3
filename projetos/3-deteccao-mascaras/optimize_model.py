@@ -18,7 +18,7 @@ from ultralytics import YOLO
 #   calibração adicional.
 # ---------------------------------------------------------------------------
 
-IMGSZ = 416
+IMGSZ = 640
 MODEL_INPUT = "model.pt"
 MODEL_OUTPUT = "model.tflite"
 

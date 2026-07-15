@@ -156,7 +156,7 @@ As principais bibliotecas de desenvolvimento utilizadas foram:
 A exportação nativa para TFLite do Ultralytics (`format="tflite"`) no Windows possui limitações de plataforma devido à dependência da nova biblioteca `LiteRT` do Google (que restringe compilações PyTorch -> TFLite para Linux e macOS). 
 
 Para otimizar o modelo localmente no Windows:
-1. O modelo PyTorch (`model.pt`) foi exportado para o formato **ONNX** (`model.onnx`) com tamanho de imagem 416.
+1. O modelo PyTorch (`model.pt`) foi exportado para o formato **ONNX** (`model.onnx`) com tamanho de imagem 640.
 2. Usamos a ferramenta **`onnx2tf`** para ler o arquivo ONNX, compilar as operações e salvá-lo como **TensorFlow Lite** (`model.tflite`) aplicando otimizações de operadores.
 
 ### 4️⃣ Resultados Obtidos
@@ -171,7 +171,7 @@ Após os treinos e otimizações, os seguintes resultados foram alcançados no c
   * `mask_weared_incorrect`: 0.4300 (43.0%)
 * **Tamanho dos arquivos:**
   * `model.pt`: 5.18 MB
-  * `model.tflite`: 9.98 MB (Float32)
+  * `model.tflite`: 10.04 MB (Float32)
 
 ### 5️⃣ Comentários Adicionais (Opcional)
 
@@ -191,13 +191,13 @@ Rodando inferência em 5 amostras usando model.tflite:
 
 Imagem                               Detecções  Detalhes
 ----------------------------------------------------------------------
-maksssksksss105.jpg                          8  [8x with_mask]
+maksssksksss105.jpg                         10  [10x with_mask]
 maksssksksss107.jpg                          1  [1x with_mask]
-maksssksksss11.jpg                          23  [22x with_mask, 1x mask_weared_incorrect]
-maksssksksss113.jpg                          4  [4x with_mask]
-maksssksksss12.jpg                          10  [9x with_mask, 1x without_mask]
+maksssksksss11.jpg                          25  [2x mask_weared_incorrect, 22x with_mask, 1x without_mask]
+maksssksksss113.jpg                          3  [3x with_mask]
+maksssksksss12.jpg                          13  [10x with_mask, 3x without_mask]
 ----------------------------------------------------------------------
-TOTAL                                       46
+TOTAL                                       52
 
 ✅ Imagens anotadas salvas em: runs/detect/inferencia_exemplos/predicoes/
 ```
@@ -205,7 +205,7 @@ TOTAL                                       46
 Ao abrir as imagens anotadas em `runs/detect/inferencia_exemplos/predicoes/`, foi possível observar que:
 * As caixas delimitadoras (bounding boxes) cobrem com precisão rostos em plano médio e close-ups.
 * A contagem de pessoas com máscara (`with_mask`) é extremamente precisa em fotos de grupo.
-* O modelo detectou corretamente a pessoa sem máscara (`without_mask`) na imagem `maksssksksss12.jpg` e a pessoa com a máscara cobrindo apenas a boca (`mask_weared_incorrect`) na imagem `maksssksksss11.jpg`.
+* O modelo detectou corretamente as pessoas sem máscara (`without_mask`) na imagem `maksssksksss12.jpg` e as pessoas com a máscara cobrindo apenas a boca (`mask_weared_incorrect`) na imagem `maksssksksss11.jpg`.
 
 ---
 

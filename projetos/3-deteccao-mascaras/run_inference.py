@@ -50,7 +50,7 @@ def main():
     for path in sample_paths:
         result = model.predict(
             source=path,
-            imgsz=416,
+            imgsz=640,
             save=True,
             project=os.path.join(script_dir, "runs", "detect"),
             name="inferencia_exemplos/predicoes",
