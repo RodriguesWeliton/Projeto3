@@ -163,20 +163,28 @@ Para otimizar o modelo localmente no Windows:
 
 Após os treinos e otimizações, os seguintes resultados foram alcançados no conjunto de validação:
 
-* **mAP50 Global:** 0.6887 (68.87%)
-* **mAP50-95 Global:** 0.4783 (47.83%)
-* **mAP50 por Classe:**
-  * `with_mask`: 0.9480 (94.8%)
-  * `without_mask`: 0.6870 (68.7%)
-  * `mask_weared_incorrect`: 0.4300 (43.0%)
+* **mAP50 Global:** 
+  * `model.pt`: 0.6890 (68.9%)
+  * `model.tflite` (Otimizado): 0.7300 (73.0%)
+* **mAP50-95 Global:** 
+  * `model.pt`: 0.4780 (47.8%)
+  * `model.tflite` (Otimizado): 0.4960 (49.6%)
+* **mAP50 por Classe (no TFLite Otimizado):**
+  * `with_mask`: 0.9450 (94.5%)
+  * `without_mask`: 0.7580 (75.8%)
+  * `mask_weared_incorrect`: 0.4850 (48.5%)
 * **Tamanho dos arquivos:**
   * `model.pt`: 5.18 MB
-  * `model.tflite`: 10.04 MB (Float32)
+  * `model.tflite`: 10.08 MB (Float32)
 
 ### 5️⃣ Comentários Adicionais (Opcional)
 
 1. **Bug do PyTorch 2.8.0 no Windows:** Durante a exportação para ONNX, o exportador legado do PyTorch 2.8.0 (versão de desenvolvimento/nightly instalada) apresentava um erro crítico de `Access Violation` (segfault) no compilador C++ da JIT. Para corrigir esse comportamento e viabilizar a exportação local, atualizamos os pacotes de ambiente para as versões estáveis `torch==2.5.1` e `torchvision==0.20.1`.
-2. **Desempenho da Classe Minoritária:** O baixo mAP50 de **43.0%** na classe `mask_weared_incorrect` reflete diretamente a escassez de amostras dessa classe no dataset de treino. Isso confirma a intuição de que o modelo tem dificuldades em generalizar o uso incorreto de máscaras, enquanto apresenta excelente desempenho na classe `with_mask` (**94.8%**).
+2. **Normalização de Coordenadas e Alinhamento de Metadados:** Para evitar que o TFLite reportasse `0.000` mAP no validador do GitHub CI devido a divergências de pós-processamento, estruturamos uma compilação customizada em `optimize_model.py` que:
+   * Envelopa a YOLO na classe de normalização `_NormalizeCoords` (dividindo as coordenadas dos boxes por `w` e `h`) antes da geração do ONNX.
+   * Exporta a rede configurando o flag `export = True` para emitir apenas o tensor consolidado `(1, 7, 8400)`.
+   * Insere o arquivo de assinatura `metadata.json` contendo o mapa de classes e stride no `.tflite` final, garantindo que o interpretador da Ultralytics decodifique a saída de forma idêntica à do PyTorch original.
+3. **Desempenho da Classe Minoritária:** O baixo mAP50 de **48.5%** na classe `mask_weared_incorrect` reflete diretamente a escassez de amostras dessa classe no dataset de treino. Isso confirma a intuição de que o modelo tem dificuldades em generalizar o uso incorreto de máscaras, enquanto apresenta excelente desempenho na classe `with_mask` (**94.5%**).
 
 ### 6️⃣ Exemplo de Inferência
 
