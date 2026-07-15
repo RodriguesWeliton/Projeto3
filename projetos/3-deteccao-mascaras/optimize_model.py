@@ -7,7 +7,6 @@ from datetime import datetime
 import torch
 from ultralytics import YOLO
 import ultralytics
-from ultralytics.utils.export.litert import _NormalizeCoords
 
 # ---------------------------------------------------------------------------
 # Projeto 3 — Otimização do Modelo (Exportação para Edge)
@@ -20,6 +19,45 @@ from ultralytics.utils.export.litert import _NormalizeCoords
 IMGSZ = 640
 MODEL_INPUT = "model.pt"
 MODEL_OUTPUT = "model.tflite"
+
+
+class CustomNormalizeCoords(torch.nn.Module):
+    """Envelopa o modelo PyTorch da YOLO para que a saída de detecção
+    tenha as coordenadas dos boxes normalizadas no intervalo [0, 1].
+    Isso é exigido pelo pós-processamento da YOLO/LiteRT backend.
+    """
+    def __init__(self, model, h, w, task, nc):
+        super().__init__()
+        self._model = model
+        self.h = h
+        self.w = w
+        self.task = task
+        self.nc = nc
+
+    def forward(self, x):
+        det = self._model(x)
+        # det shape: (batch, 4 + nc, anchors)
+        box_wh = torch.tensor([self.w, self.h, self.w, self.h], dtype=det.dtype, device=det.device).view(1, 4, 1)
+        parts = [det[:, :4] / box_wh]  # normaliza as coordenadas xywh por largura/altura
+        parts.append(det[:, 4:])       # mantém scores de classes e outros coeficientes inalterados
+        return torch.cat(parts, dim=1)
+
+    def fuse(self):
+        """Executa a fusão do modelo interno e envelopa o resultado
+        em uma nova instância de CustomNormalizeCoords para manter a
+        normalização ativa durante todo o processo de exportação.
+        """
+        fused_inner = self._model.fuse()
+        return CustomNormalizeCoords(fused_inner, self.h, self.w, self.task, self.nc)
+
+    def __getattr__(self, name):
+        """Redireciona buscas de atributos para o modelo interno
+        para que o exportador da Ultralytics consiga ler stride, names, etc.
+        """
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self._model, name)
 
 
 def main():
@@ -37,7 +75,7 @@ def main():
             "Execute train_model.py primeiro para gerar o modelo treinado."
         )
 
-    # 1. Carregar o modelo treinado e preparar para exportação
+    # 1. Carregar o modelo treinado
     yolo_model = YOLO(MODEL_INPUT)
     model = yolo_model.model
     model.eval()
@@ -48,31 +86,22 @@ def main():
             m.export = True
 
     # 2. Envelopar o modelo para normalizar as coordenadas para [0, 1]
-    # Isso é obrigatório no contrato de pós-processamento da YOLO/LiteRT para manter precisão de scores
     print("\nNormalizando as coordenadas dos boxes e envelopando o modelo...")
-    wrapped_model = _NormalizeCoords(
+    wrapped_model = CustomNormalizeCoords(
         model=model,
         h=IMGSZ,
         w=IMGSZ,
         task="detect",
-        nc=len(yolo_model.names),
-        kpt_shape=None
+        nc=len(yolo_model.names)
     )
 
-    # 3. Exportar o modelo envelopado para ONNX
+    # Substitui o modelo interno do YOLO pelo nosso modelo envelopado
+    yolo_model.model = wrapped_model
+
+    # 3. Exportar o modelo envelopado para ONNX usando o próprio exportador da Ultralytics
+    # Isso evita problemas de JIT e dependência de 'onnxscript' em ambientes CI de terceiros.
     print(f"\nExportando para ONNX com imgsz={IMGSZ}...")
-    onnx_path = "model.onnx"
-    dummy_input = torch.zeros(1, 3, IMGSZ, IMGSZ)
-    torch.onnx.export(
-        wrapped_model,
-        dummy_input,
-        onnx_path,
-        verbose=False,
-        opset_version=17,
-        input_names=["images"],
-        output_names=["output0"],
-        dynamic_axes={"images": {0: "batch"}, "output0": {0: "batch"}}
-    )
+    onnx_path = yolo_model.export(format="onnx", imgsz=IMGSZ, simplify=False)
     print(f"✅ ONNX exportado com sucesso: {onnx_path}")
 
     # 4. Converter ONNX para TensorFlow Lite usando onnx2tf com preservação do formato do input (-k images)
